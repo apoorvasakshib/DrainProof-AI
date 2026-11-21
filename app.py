@@ -360,16 +360,25 @@ def extract_gps_from_screenshot(photo_path):
     if path is None or not path.exists():
         return None, None, "The uploaded screenshot could not be found."
 
+    
+    
     try:
-        # Use the standard Windows installation path when it exists.
-        windows_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        if os.path.exists(windows_tesseract):
-            pytesseract.pytesseract.tesseract_cmd = windows_tesseract
+        # Configure Tesseract executable on Windows.
+        if os.name == "nt":
+            windows_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+            if os.path.exists(windows_tesseract):
+                pytesseract.pytesseract.tesseract_cmd = windows_tesseract
+
+            project_tessdata = Path(__file__).resolve().parent / "tessdata"
+
+            if (project_tessdata / "eng.traineddata").exists():
+                os.environ["TESSDATA_PREFIX"] = str(project_tessdata)
+
+        # Process the uploaded screenshot on both Windows and Linux.
         with Image.open(path) as original:
             image = ImageOps.exif_transpose(original).convert("RGB")
 
-            # Enlarge small screenshots and improve contrast before OCR.
             if image.width < 1800:
                 scale = min(3, max(2, 1800 // max(image.width, 1)))
                 image = image.resize(
@@ -384,6 +393,8 @@ def extract_gps_from_screenshot(photo_path):
                 image,
                 config="--oem 3 --psm 11"
             )
+
+
 
         # Correct common OCR substitutions only when they occur between digits.
         ocr_text = re.sub(r"(?<=\d)[Oo](?=[\d.,])", "0", ocr_text)
@@ -1458,7 +1469,7 @@ def citizen_reports_page(user):
 # =========================================================
 
 def staff_dashboard_page(user):
-    st.title("🧰 Staff Dashboard")
+    st.title("🧰 Worker Dashboard")
     st.write("Review active drainage complaints and submit resolution evidence.")
 
     active = get_active_issues()
@@ -1472,7 +1483,7 @@ def staff_dashboard_page(user):
     st.divider()
 
     page = st.sidebar.radio(
-        "Staff Navigation",
+        "Worker Navigation",
         [
             "Active Issues",
             "Resolved Issues"
@@ -1489,36 +1500,94 @@ def staff_dashboard_page(user):
 # USER MANAGEMENT
 # =========================================================
 
+
 def user_management_page():
-    st.title("👥 User Management")
+    st.title("User Management")
+
+    # -----------------------------------------
+    # CREATE Worker ACCOUNT
+    # -----------------------------------------
+
+    st.subheader("Create Worker Account")
+
+    with st.form("create_staff_form"):
+        staff_name = st.text_input("Worker Full Name")
+        staff_email = st.text_input("Worker Email")
+        staff_password = st.text_input(
+            "Worker Password",
+            type="password"
+        )
+        confirm_password = st.text_input(
+            "Confirm Password",
+            type="password"
+        )
+
+        create_staff = st.form_submit_button(
+            "Create Worker Account",
+            use_container_width=True
+        )
+
+        if create_staff:
+            if not staff_name.strip() or not staff_email.strip():
+                st.error("Please enter the worker name and email.")
+
+            elif not staff_password:
+                st.error("Please enter a password.")
+
+            elif staff_password != confirm_password:
+                st.error("Passwords do not match.")
+
+            else:
+                try:
+                    create_user(
+                        full_name=staff_name,
+                        email=staff_email,
+                        password=staff_password,
+                        role="Worker"
+                    )
+
+                    st.success("Worker account created successfully!")
+                    st.rerun()
+
+                except Exception as error:
+                    st.error(f"Could not create worker account: {error}")
+
+    st.divider()
+
+    # -----------------------------------------
+    # REGISTERED USERS
+    # -----------------------------------------
+
+    st.subheader("Registered Users")
 
     try:
         users = get_all_users()
+
+        st.write(f"Registered users: {len(users)}")
+
+        if not users:
+            st.info("No users are registered.")
+            return
+
+        for user in users:
+            with st.container(border=True):
+                st.write(
+                    f"**{get_value(user, 'full_name', 'Unknown')}**"
+                )
+                st.write(
+                    f"Email: {get_value(user, 'email', 'Not available')}"
+                )
+                st.write(
+                    f"Role: {get_value(user, 'role', 'Not available')}"
+                )
+                st.write(
+                    f"User ID: {get_value(user, 'id', 'Not available')}"
+                )
+
     except Exception as error:
         st.error(f"Could not load users: {error}")
-        return
 
-    if not users:
-        st.info("No users are registered.")
-        return
-
-    st.write(f"**Registered users:** {len(users)}")
-
-    for user in users:
-        with st.container(border=True):
-            st.write(
-                f"**{get_value(user, 'full_name', 'Unknown')}**"
-            )
-            st.write(
-                f"Email: {get_value(user, 'email', 'Not available')}"
-            )
-            st.write(
-                f"Role: {get_value(user, 'role', 'Not available')}"
-            )
-            st.write(
-                f"User ID: {get_value(user, 'id', 'Not available')}"
-            )
-
+    
 
 # =========================================================
 # APPLICATION ENTRY POINT
@@ -1577,7 +1646,7 @@ def main():
         elif page == "My Reports":
             citizen_reports_page(user)
 
-    elif role == "Staff":
+    elif role in ["Worker", "Staff"]:
         staff_dashboard_page(user)
 
     else:

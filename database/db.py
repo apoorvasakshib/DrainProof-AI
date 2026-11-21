@@ -11,7 +11,7 @@ DB_NAME = os.path.join(BASE_DIR, "drainproof.db")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 HASH_ALGORITHM = "sha256"
 HASH_ITERATIONS = 600000
-VALID_ROLES = ["Citizen", "Admin", "Staff"]
+VALID_ROLES = ["Citizen", "Admin", "Worker", "Staff"]
 VALID_GPS_SOURCES = {"EXIF", "SCREENSHOT_OCR"}
 MAX_RESOLUTION_DISTANCE = 100.0
 
