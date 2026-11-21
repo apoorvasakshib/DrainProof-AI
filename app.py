@@ -21,6 +21,7 @@ from database.db import (
     register_citizen,
     create_user,
     get_all_users,
+    get_user_by_email,
     get_all_issues,
     save_issue,
     save_resolution_evidence,
@@ -49,7 +50,32 @@ st.set_page_config(
 )
 
 create_table()
+# =========================================================
+# INITIAL ADMIN ACCOUNT SETUP
+# =========================================================
 
+try:
+    admin_name = st.secrets["ADMIN_NAME"]
+    admin_email = st.secrets["ADMIN_EMAIL"]
+    admin_password = st.secrets["ADMIN_PASSWORD"]
+
+    existing_admin = get_user_by_email(admin_email)
+
+    if existing_admin is None:
+        create_user(
+            full_name=admin_name,
+            email=admin_email,
+            password=admin_password,
+            role="Admin"
+        )
+
+    elif existing_admin["role"] != "Admin":
+        st.error(
+            "The configured admin email belongs to a non-admin account."
+        )
+
+except (KeyError, FileNotFoundError):
+    pass
 MAX_VERIFICATION_DISTANCE = 100
 
 
